@@ -12,7 +12,7 @@ python -m pip install -e .
 python -m unittest discover -s tests -v
 ```
 
-Python 3.11+; dependencies are requests, pandas and pyarrow. Run commands from the repository root. All downloaded records, raw responses, checkpoints and Parquet files are gitignored.
+Python 3.11+; dependencies are requests, pandas and pyarrow. `requirements.lock.txt` records the exact versions used for validation (Python 3.14 on macOS); optionally install it with `python -m pip install -r requirements.lock.txt` before installing this project. Run commands from the repository root. All downloaded records, raw responses, checkpoints and Parquet files are gitignored.
 
 ## Check access and selection first
 

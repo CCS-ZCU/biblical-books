@@ -1,0 +1,14 @@
+{
+  "endpoint": "https://sru.k10plus.de/opac-de-627",
+  "queries": [
+    {"id": "ddc_bible", "cql": "pica.ddc=22*", "reason": "DDC 220-229 and subdivisions; includes Bible editions and non-academic works."},
+    {"id": "lcc_bible", "cql": "pica.lcc=BS*", "reason": "LCC BS, The Bible; includes primary texts and non-academic works."},
+    {"id": "subject_bibel", "cql": "pica.sw=Bibel", "reason": "GND subject index; supplements incomplete classification."},
+    {"id": "subject_bible", "cql": "pica.lsh=Bible", "reason": "Library of Congress subject headings."},
+    {"id": "subject_old_testament", "cql": "pica.sw=\"Altes Testament\"", "reason": "German subject terms."},
+    {"id": "subject_new_testament", "cql": "pica.sw=\"Neues Testament\"", "reason": "German subject terms."},
+    {"id": "title_biblical", "cql": "pica.tit=biblical", "reason": "Title supplement; higher risk of false positives."},
+    {"id": "title_biblique", "cql": "pica.tit=biblique*", "reason": "French title supplement."},
+    {"id": "title_biblisch", "cql": "pica.tit=biblisch*", "reason": "German title supplement."}
+  ]
+}
