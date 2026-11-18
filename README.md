@@ -31,6 +31,8 @@ biblical-books export
 
 Run `harvest` again to resume; committed pages are skipped. Run `export` again to update the Parquet files. Stop with Ctrl-C between requests; the current SQLite transaction is atomic. **Run one harvester at a time per data directory.** The default is 100 records/request with a one-second pause, plus retry/backoff for 429 and transient server errors. At hundreds of thousands of records this can take hours. Follow provider restrictions, and consult the service team if rate limits or result-window limits appear; never silently regard a truncated query as complete.
 
+A record that K10plus cannot serialize is reported as a diagnostic inside its own position while the rest of the page is returned normally. Such positions are skipped **with evidence**: they are listed in the `failures` table and in `status.json` (`skipped_positions`, `unretrievable_records`), and the page is flagged `skipped` in `pages`. The harvest continues instead of blocking every later page; more than one bad record per page (or 5%) is still treated as a systemic failure and stops the run. Query-level diagnostics and malformed responses remain fatal.
+
 For a bounded smoke run, in its own directory:
 
 ```bash
@@ -75,7 +77,7 @@ df = pd.read_parquet("data/k10plus/books.parquet",
 ## Files and columns
 
 - `data/k10plus/raw/<query>/<start>.xml.gz`: original SRU responses, including MARC data.
-- `harvest.sqlite`: records, query membership and transactionally saved page checkpoints.
+- `harvest.sqlite`: records, query membership and transactionally saved page checkpoints; the `failures` table lists unretrievable result positions with their page checksum.
 - `selection.json`: exact configuration bound to this harvest.
 - `status.json`, `export.json`: completion status, advertised counts, export counts and schema.
 - `records.parquet`: one row per K10plus record ID in the search union.

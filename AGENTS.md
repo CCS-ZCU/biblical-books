@@ -77,6 +77,8 @@ Detach with Ctrl-B, then D; return with `tmux attach -t biblical-books`. Follow 
 
 Run one harvester per data directory. Keep the default sequential requests, 100 records per page and one-second delay. Retries/backoff handle HTTP 429 and transient server errors. Respect provider restrictions; do not increase request concurrency to force throughput. SRU diagnostics, malformed responses and unexpected empty pages are errors, not successful completion.
 
+One exception is deliberate and audited. A single catalogue record can be permanently unretrievable: K10plus then returns HTTP 200 for the whole page with a diagnostic `info:srw/diagnostic/1/63` **inside that position's `recordData`**, while the other 99 records are fine. Refusing the page would block every later page of the query, so the harvester records such positions in the `failures` table (query, position, diagnostic, page SHA-256, raw path), marks the page `skipped=1` in `pages`, logs a warning, and continues. `status.json` reports `skipped_positions`, the full `unretrievable_records` list and a per-query `skipped_positions`; the export manifest carries the same count. Nothing is dropped silently, and a page where more than one record (or 5% of a 100-record page) is unretrievable still raises, because that indicates a systemic fault. Query-level diagnostics, missing result counts and empty pages before the advertised end remain fatal.
+
 On interruption or error, inspect the log, address the cause and run the same harvest command again. Already committed pages are skipped. To preserve earlier logs, use a new log filename or append redirection (`>>`) for a resumed run. Never delete checkpoints just to make a run appear complete.
 
 After `harvest` succeeds:

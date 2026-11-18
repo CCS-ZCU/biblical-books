@@ -19,6 +19,9 @@ from .marc import MARC, LIST_COLUMNS, STRING_COLUMNS, parse_record
 
 LOG = logging.getLogger(__name__)
 SRU = "{http://www.loc.gov/zing/srw/}"
+SRU_DIAGNOSTIC = "{http://www.loc.gov/zing/srw/diagnostic/}"
+# A page where this share of records is unretrievable suggests a systemic fault, not one bad record.
+MAX_UNRETRIEVABLE_SHARE = 0.05
 
 
 def now():
@@ -34,7 +37,12 @@ def connect(path):
     CREATE TABLE IF NOT EXISTS records (id TEXT PRIMARY KEY, payload TEXT NOT NULL, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS hits (record_id TEXT, query_id TEXT, PRIMARY KEY(record_id, query_id));
     CREATE TABLE IF NOT EXISTS pages (query_id TEXT, start INTEGER, count INTEGER, total INTEGER, fetched_at TEXT, sha256 TEXT, raw_path TEXT, PRIMARY KEY(query_id,start));
+    CREATE TABLE IF NOT EXISTS failures (query_id TEXT, position INTEGER, diagnostic TEXT, fetched_at TEXT, sha256 TEXT, raw_path TEXT, PRIMARY KEY(query_id,position));
     """)
+    # Older databases predate per-record failure tracking; a skipped page position is zero by default.
+    if "skipped" not in {row[1] for row in db.execute("PRAGMA table_info(pages)")}:
+        db.execute("ALTER TABLE pages ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0")
+        db.commit()
     return db
 
 
@@ -47,26 +55,44 @@ def session():
 
 
 def request_page(client, endpoint, cql, start, size):
+    """Fetch one page, returning (raw bytes, total, records, unretrievable positions).
+
+    A single catalogued record can be unretrievable: K10plus then returns HTTP 200 with a
+    diagnostic 63 *inside* that position's recordData while the rest of the page is fine.
+    Such positions are returned as failures so the caller can record them explicitly; a
+    query-level diagnostic, a missing result count or a mostly unretrievable page still raises.
+    """
     response = client.get(endpoint, params={"version": "1.1", "operation": "searchRetrieve", "query": cql, "startRecord": start, "maximumRecords": size, "recordSchema": "marcxml", "recordPacking": "xml"}, timeout=(15, 120))
     response.raise_for_status()
     content = response.content
     root = ET.fromstring(content)
-    diagnostics = [" ".join(" ".join(d.itertext()).split()) for d in root.iter() if d.tag.split("}")[-1] == "diagnostic"]
-    if diagnostics:
-        raise RuntimeError("SRU diagnostic: " + "; ".join(diagnostics))
-    number = root.findtext(SRU + "numberOfRecords")
-    if number is None:
-        raise RuntimeError("Response is not an SRU search response (missing numberOfRecords)")
     wrappers = root.findall(SRU + "records/" + SRU + "record")
-    records = []
-    for wrapper in wrappers:
+    records, failures = [], []
+    per_record = []
+    for index, wrapper in enumerate(wrappers):
+        position = wrapper.findtext(SRU + "recordPosition")
+        position = int(position) if position and position.strip().isdigit() else start + index
         record = wrapper.find(".//" + MARC + "record")
-        if record is None:
-            raise RuntimeError("SRU record does not contain MARC XML; refusing to skip it")
-        records.append(parse_record(record))
-    if start <= int(number) and not records and size:
+        if record is not None:
+            records.append(parse_record(record))
+            continue
+        diagnostic = wrapper.find(SRU + "recordData/" + SRU_DIAGNOSTIC + "diagnostic")
+        if diagnostic is None:
+            raise RuntimeError(f"SRU record at position {position} has neither MARC XML nor a diagnostic; refusing to skip it")
+        per_record.append(diagnostic)
+        failures.append({"position": position, "diagnostic": " ".join(" ".join(diagnostic.itertext()).split())})
+    diagnostics = [" ".join(" ".join(d.itertext()).split()) for d in root.iter(SRU_DIAGNOSTIC + "diagnostic") if not any(d is found for found in per_record)]
+    number = root.findtext(SRU + "numberOfRecords")
+    if diagnostics or number is None:
+        raise RuntimeError("SRU diagnostic: " + ("; ".join(diagnostics) or "Response is not an SRU search response (missing numberOfRecords)"))
+    total = int(number)
+    # One bad record in a page is a catalogue defect; a page full of them is a systemic fault.
+    tolerable = max(1, int(len(wrappers) * MAX_UNRETRIEVABLE_SHARE))
+    if len(failures) > tolerable:
+        raise RuntimeError(f"{len(failures)} of {len(wrappers)} records unretrievable from startRecord={start}; treating as a systemic failure instead of skipping them")
+    if start <= total and not records and not failures and size:
         raise RuntimeError("Empty page before advertised end of results")
-    return content, int(number), records
+    return content, total, records, failures
 
 
 def config_load(path):
@@ -114,7 +140,7 @@ def harvest(args):
                     LOG.info("%s: stopped at --max-pages; rerun without the limit to continue", qid)
                     break
                 time.sleep(args.delay)
-                raw, total, records = request_page(client, config["endpoint"], cql, start, args.page_size)
+                raw, total, records, failures = request_page(client, config["endpoint"], cql, start, args.page_size)
                 prior = db.execute("SELECT total FROM pages WHERE query_id=? ORDER BY start LIMIT 1", (qid,)).fetchone()
                 if prior and prior[0] != total:
                     LOG.warning("%s: result count changed %s -> %s; catalogue is live, rerun into a fresh directory for comparison", qid, prior[0], total)
@@ -124,16 +150,24 @@ def harvest(args):
                 temp = raw_path.with_suffix(".tmp")
                 temp.write_bytes(gzip.compress(raw, mtime=0))
                 temp.replace(raw_path)
+                digest = hashlib.sha256(raw).hexdigest()
+                relative = str(raw_path.relative_to(args.data_dir))
+                # Positions consumed, not records stored: an unretrievable position still advances the cursor.
+                positions = len(records) + len(failures)
                 with db:
                     for row in records:
                         db.execute("INSERT INTO records VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,last_seen=excluded.last_seen", (row["record_id"], json.dumps(row, ensure_ascii=False), stamp, stamp))
                         db.execute("INSERT OR IGNORE INTO hits VALUES (?,?)", (row["record_id"], qid))
-                    db.execute("INSERT INTO pages VALUES (?,?,?,?,?,?,?)", (qid, start, len(records), total, stamp, hashlib.sha256(raw).hexdigest(), str(raw_path.relative_to(args.data_dir))))
-                LOG.info("%s: %s–%s / %s", qid, start, start + len(records) - 1, total)
+                    for failure in failures:
+                        db.execute("INSERT OR REPLACE INTO failures VALUES (?,?,?,?,?,?)", (qid, failure["position"], failure["diagnostic"], stamp, digest, relative))
+                    db.execute("INSERT INTO pages (query_id,start,count,total,fetched_at,sha256,raw_path,skipped) VALUES (?,?,?,?,?,?,?,?)", (qid, start, positions, total, stamp, digest, relative, len(failures)))
+                for failure in failures:
+                    LOG.warning("%s: unretrievable record at position %s of %s (%s); recorded in the failures table, harvest continues", qid, failure["position"], total, failure["diagnostic"])
+                LOG.info("%s: %s–%s / %s", qid, start, start + positions - 1, total)
                 pages += 1
-                if not records or start + len(records) > total:
+                if not positions or start + positions > total:
                     break
-                start += len(records)
+                start += positions
     finally:
         client.close()
         db.close()
@@ -149,7 +183,8 @@ def summarize(db):
             if start != next_start:
                 break
             next_start += count
-        output.append({"id": qid, "cql": cql, "pages": len(pages), "downloaded_occurrences": sum(p[1] for p in pages), "advertised_total": pages[-1][2] if pages else None, "complete": bool(pages) and next_start > pages[-1][2]})
+        skipped = db.execute("SELECT coalesce(sum(skipped),0) FROM pages WHERE query_id=?", (qid,)).fetchone()[0]
+        output.append({"id": qid, "cql": cql, "pages": len(pages), "downloaded_occurrences": sum(p[1] for p in pages), "skipped_positions": skipped, "advertised_total": pages[-1][2] if pages else None, "complete": bool(pages) and next_start > pages[-1][2]})
     return output
 
 
@@ -158,7 +193,9 @@ def status(args):
     if not db_path.exists():
         raise ValueError("No harvest database found")
     with closing(connect(db_path)) as db:
-        report = {"generated_at": now(), "unique_records": db.execute("SELECT count(*) FROM records").fetchone()[0], "queries": summarize(db)}
+        # Unretrievable positions are listed, never hidden: a complete query may still have them.
+        failures = [dict(query_id=qid, position=position, diagnostic=diagnostic, raw_path=raw_path) for qid, position, diagnostic, raw_path in db.execute("SELECT query_id,position,diagnostic,raw_path FROM failures ORDER BY query_id,position")]
+        report = {"generated_at": now(), "unique_records": db.execute("SELECT count(*) FROM records").fetchone()[0], "skipped_positions": len(failures), "unretrievable_records": failures, "queries": summarize(db)}
     config_path = args.data_dir / "selection.json"
     if config_path.exists():
         done = {q["id"]: q for q in report["queries"]}
@@ -175,7 +212,7 @@ def export(args):
     report = status(args)
     strings = STRING_COLUMNS + ["date_type", "first_seen", "last_seen"]
     schema = pa.schema([(c, pa.string()) for c in strings] + [(c, pa.list_(pa.string())) for c in LIST_COLUMNS + ["matched_queries"]] + [("publication_year", pa.int32()), ("is_textual_monograph", pa.bool_())])
-    schema = schema.with_metadata({b"source": b"K10plus SRU", b"selection_complete": str(report.get("selection_complete", False)).encode(), b"exported_at": now().encode()})
+    schema = schema.with_metadata({b"source": b"K10plus SRU", b"selection_complete": str(report.get("selection_complete", False)).encode(), b"skipped_positions": str(report.get("skipped_positions", 0)).encode(), b"exported_at": now().encode()})
     output = args.data_dir / "records.parquet"
     books = args.data_dir / "books.parquet"
     temp = output.with_suffix(".parquet.tmp")
