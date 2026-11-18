@@ -131,3 +131,10 @@ When reporting completion, distinguish successful retrieval of the configured un
 Read `README.md` and the relevant source before changing the pipeline. Inspect file sizes before reading unknown files, keep tool output bounded, and process large data locally in chunks. Avoid loading the corpus into chat context. Run the offline tests after substantive code changes; documentation-only updates need command/argument verification, not a new harvest.
 
 Official service references and field details are linked in `README.md`.
+
+## Repository housekeeping
+
+IDE artifacts (`.idea/`, `*.iml`) and Jupyter checkpoints (`.ipynb_checkpoints/`)
+are not tracked. Bulk data and model directories (`large_files/`, `large_data/`)
+are never committed; keep large inputs and outputs there. See the
+[organizer](https://github.com/kasev/organizer) workspace for the shared workflow.

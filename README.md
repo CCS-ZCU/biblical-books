@@ -104,3 +104,10 @@ Deduplication is by catalogue ID only. Print/e-book versions, translations and r
 - [K10plus data provision and service conditions](https://wiki.k10plus.de/spaces/K10PLUS/pages/27361297/Datenbereitstellung)
 
 Access, redistribution and metadata licensing should be checked against current provider terms before publishing the dataset. This repository stores code and instructions; metadata remain local and outside Git.
+
+## Repository housekeeping
+
+IDE artifacts (`.idea/`, `*.iml`) and Jupyter checkpoints (`.ipynb_checkpoints/`)
+are not tracked. Bulk data and model directories (`large_files/`, `large_data/`)
+are never committed; keep large inputs and outputs there. See the
+[organizer](https://github.com/kasev/organizer) workspace for the shared workflow.
