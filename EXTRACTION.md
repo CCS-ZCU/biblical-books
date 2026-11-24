@@ -208,5 +208,6 @@ not re-parse the archived XML.
 .venv/bin/biblical-books derive       # offline: structured contributors, dates, authority IDs
 ```
 
-`scripts/explore_k10plus.ipynb` reproduces every number in this document from the exported files, and
+`scripts/1_explore-k10plus.ipynb` reproduces every number in this document from the exported files, and
 loads `books_full.parquet` — the machine-readable frame written by `derive` (see `DERIVATION.md`).
+The two following notebooks extract and visualise the analysis subset; see `NOTEBOOKS.md`.

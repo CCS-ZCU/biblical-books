@@ -14,6 +14,16 @@ python -m unittest discover -s tests -v
 
 Python 3.11+; dependencies are requests, pandas and pyarrow. `requirements.lock.txt` records the exact versions used for validation (Python 3.14 on macOS); optionally install it with `python -m pip install -r requirements.lock.txt` before installing this project. Run commands from the repository root. All downloaded records, raw responses, checkpoints and Parquet files are gitignored.
 
+## Documentation
+
+| document | contents |
+|---|---|
+| [`EXTRACTION.md`](EXTRACTION.md) | plain-language account of the source catalogue, the nine searches, what each contributes, and the limits of the result |
+| [`DERIVATION.md`](DERIVATION.md) | the offline `derive` step: structured contributors, parsed life dates, GND identifiers, the German–English subject concept map |
+| [`NOTEBOOKS.md`](NOTEBOOKS.md) | the three analysis notebooks, their filtering decisions, dependencies and known pitfalls |
+| [`VALIDATION.md`](VALIDATION.md) | live checks: pipeline mechanics and the completed full harvest |
+| [`AGENTS.md`](AGENTS.md) | operating handoff: setup, harvest/recovery procedure, conventions |
+
 ## Check access and selection first
 
 ```bash

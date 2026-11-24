@@ -1,0 +1,13 @@
+# Notebook-only dependencies (not needed by the harvest/export pipeline).
+# Install on top of requirements.txt:
+#   .venv/bin/python -m pip install -r requirements-notebooks.txt
+#   .venv/bin/python -m spacy download en_core_web_md
+#   .venv/bin/python -m spacy download de_core_news_md
+#   .venv/bin/python -m spacy download fr_core_news_md
+#   .venv/bin/python -m nltk.downloader stopwords
+#
+# Versions verified on 2026-11-24 with Python 3.12.3 / pandas 3.1.1.
+nltk==3.10.4
+spacy==3.8.18
+wordcloud==1.9.6
+matplotlib==3.11.2
