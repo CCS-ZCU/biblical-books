@@ -21,3 +21,6 @@ __pycache__/
 # --- workflow housekeeping: bulk data is never committed ---
 large_files/
 large_data/
+
+# Repo guidance symlink: canonical guidance lives in AGENTS.md
+/CLAUDE.md

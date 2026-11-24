@@ -8,15 +8,15 @@ Collect broadly first. The original research question concerned changing title v
 
 The configured searches identify **candidates**, not a proven exhaustive or academic-only corpus. State that distinction in reports. K10plus coverage and incomplete cataloguing prevent a defensible claim that every Biblical Studies book worldwide has been retrieved.
 
-## Current state at handoff (18 November 2026)
+## Current state (harvest complete, 20 November 2026)
 
 - Private repository: https://github.com/kasev/biblical-books
-- Original local checkout: `~/Projects/biblical-books`; use an appropriate directory on the server.
 - Implementation: `src/biblical_books/cli.py` (SRU, checkpoints, export), `src/biblical_books/marc.py` (metadata parsing), `config/queries.json` (selection).
-- Four offline tests passed. See `VALIDATION.md` for the live checks.
-- All nine configured queries were tested. Largest query, `pica.sw=Bibel`, advertised 359,124 records; a request near its end returned records successfully. Counts will change and overlap substantially.
-- A bounded local smoke harvest produced 68 distinct candidates and 51 textual monographs, each with 39 exported columns. These gitignored files are not on GitHub and will not arrive in a server clone.
-- **The full harvest has not run.** The next substantial task is the full server harvest, export and quality assessment.
+- Six offline tests pass. See `VALIDATION.md` for the live checks.
+- **The full harvest has run and been exported.** All nine queries completed (`selection_complete: true`) on 2026-11-18 between 11:01 and 21:52 UTC: 8,564 pages, 856,135 result positions, **525,205 distinct candidates**, of which **300,542 are textual monographs**. Data on the server at `data/k10plus/` (6.9 GB, including 654 MB of archived raw responses); exported 2026-11-20T15:36:28Z.
+- One `title_biblisch` position is permanently unretrievable and is recorded in the `failures` table.
+- `scripts/explore_k10plus.ipynb` documents the result; **`EXTRACTION.md` is the human-readable account** of the source catalogue, the nine searches and their contributions, and the known limitations.
+- Still outstanding: recall validation against a documented list of known books (see "Validation and analysis handoff"), and work-level deduplication.
 
 ## Selection strategy
 
@@ -123,6 +123,8 @@ assert df.record_id.is_unique
 Export streams bounded batches into Parquet. Loading all metadata, especially `marc_json`, requires additional RAM; select columns for lightweight checks and analysis.
 
 Report unique candidate and book counts, query completion, date/language distributions, missingness in key metadata, format distribution, and coverage against known books. Inspect samples of classification-only, subject-only and title-only matches for relevance. Keep decisions to exclude records auditable rather than modifying raw evidence. Verify row counts against `export.json` and confirm both Parquet files can be read.
+
+Three composition facts to state whenever the corpus is described: 32.1% of monographs predate 1900 (94,784 records — a property of the holding libraries); 8,269 records (2.8%) come from licensed historical e-book/microfilm packages (EEBO, Early American Imprints, Nineteenth Century Collections Online, Making of the Modern World, Eighteenth Century Collections, Sabin Americana) and 99.7% of those predate 1900, so filter on `series` before computing title-vocabulary trends; excluding them the pre-1900 share is 30.2%, so quote whichever frame you mean. Also: 6 records carry `publication_year = 0`, because MARC 008 date1 `0000` denotes "no date" but parses as integer zero. Fixing the last one means treating 0 and 9999 as null in `marc.py` and re-exporting — a re-harvest is not needed.
 
 Back up or transfer data separately from Git after stopping writers, including SQLite and any WAL sidecars if present, raw responses, configuration and manifests. Keep exact raw evidence if regenerating parsed metadata later. Do not assume rerunning `export` reparses raw XML: it exports the parsed payloads already in SQLite.
 

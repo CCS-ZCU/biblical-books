@@ -93,6 +93,8 @@ Repeated metadata are genuine list columns: `authors` (main-entry names), `edito
 
 ## Selection and limits
 
+For a plain-language account of the source catalogue, the nine searches, what each contributes and the known limitations of the completed harvest, read [`EXTRACTION.md`](EXTRACTION.md). The summary below is the technical outline.
+
 `config/queries.json` combines DDC 22*, LCC BS*, German and LC subjects, and English/German/French title supplements. Every query is run separately so its contribution is auditable. Primary texts, devotional works and false positives are intentionally retained at this stage. `books.parquet` is a **format filter**, not a validated academic-only corpus.
 
 To improve recall, add verified subject/authority searches for individual biblical books, related ancient literature and relevant academic series. Neighbouring Jewish studies, archaeology, ancient languages, reception and early Christian history are not fully captured by these seeds. Validate against a documented bibliography across languages, dates and publishers; record missing known books before expanding the search. Broad keyword additions can introduce substantial noise. No arbitrary size cap is imposed.
@@ -104,8 +106,9 @@ Deduplication is by catalogue ID only. Print/e-book versions, translations and r
 - [K10plus SRU endpoint, query indexes, formats and pagination examples](https://wiki.k10plus.de/spaces/K10PLUS/pages/27361342/SRU)
 - [Live Explain/search-index definitions](https://sru.k10plus.de/opac-de-627?version=1.1&operation=explain)
 - [K10plus data provision and service conditions](https://wiki.k10plus.de/spaces/K10PLUS/pages/27361297/Datenbereitstellung)
+- [K10plus open data: scope, licence (CC0) and bulk deliveries](https://wiki.k10plus.de/spaces/K10PLUS/pages/358711298/Open+Data)
 
-Access, redistribution and metadata licensing should be checked against current provider terms before publishing the dataset. This repository stores code and instructions; metadata remain local and outside Git.
+K10plus catalogue data are published under CC0, so a derived bibliography may be redistributed. Access, metadata licensing and the provider's service conditions should still be checked against the current terms before publishing the dataset. This repository stores code and instructions; metadata remain local and outside Git.
 
 ## Repository housekeeping
 
