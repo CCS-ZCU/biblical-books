@@ -16,7 +16,8 @@ The configured searches identify **candidates**, not a proven exhaustive or acad
 - **The full harvest has run and been exported.** All nine queries completed (`selection_complete: true`) on 2026-11-18 between 11:01 and 21:52 UTC: 8,564 pages, 856,135 result positions, **525,205 distinct candidates**, of which **300,542 are textual monographs**. Data on the server at `data/k10plus/` (6.9 GB, including 654 MB of archived raw responses); exported 2026-11-20T15:36:28Z.
 - One `title_biblisch` position is permanently unretrievable and is recorded in the `failures` table.
 - `scripts/explore_k10plus.ipynb` documents the result; **`EXTRACTION.md` is the human-readable account** of the source catalogue, the nine searches and their contributions, and the known limitations.
-- Still outstanding: recall validation against a documented list of known books (see "Validation and analysis handoff"), and work-level deduplication.
+- **`biblical-books derive` has been run** (offline, 65 s): `books_full.parquet` (43 columns, structured `contributor_records` and `subjects_structured`, GND IDs on names *and* subjects, parsed life dates) and `contributors.parquet` (492,785 rows). 99.8% of `$d` strings parsed; 216,271 records have a GND ID on a name. Decisions and measurements in **`DERIVATION.md`**.
+- Still outstanding: recall validation against a documented list of known books (see "Validation and analysis handoff"), work-level deduplication, and the optional GND resolution pass (94,539 distinct IDs, ~26 h sequential — keep it as a separate cached artefact so the bibliography stays reproducible offline).
 
 ## Selection strategy
 
@@ -102,12 +103,15 @@ All harvest outputs are under the selected data directory and excluded from Git:
 - `status.json`, `export.json`: completion status, counts and export schema.
 - `records.parquet`: all distinct candidate records.
 - `books.parquet`: textual-monograph subset (MARC leader type `a`, bibliographic level `m`), including edited volumes.
+- `books_full.parquet`, `contributors.parquet`, `derive.json`: written by `derive` — `books.parquet` plus structured contributors/dates/authority IDs, a long contributor table, and its manifest. See `DERIVATION.md`.
 
 Metadata include title/subtitle, authors, explicitly identified editors, contributors, publication year/date statement, publishers, publication places, ISBNs, edition, extent, series, languages, subjects, classifications, URLs, related IDs and provenance. Repeated metadata are list columns. Missing values stay missing. Full returned MARC metadata are preserved in `marc_json`; the original response bytes remain in `raw/`.
 
 `books.parquet` is a format filter: it still includes primary texts, devotional books and other non-academic works. Multipart parent records may fall outside the strict filter but remain in the candidate table when retrieved. Print/e-book editions, translations and revised editions remain separate records. Do not collapse them merely because titles match.
 
 Publication year is inferred from numeric MARC 008 date1, otherwise a single unambiguous year in publication statements. Retain `date_type` and `date_text` for interpretation. Date1 can describe reprints or multipart works; forthcoming years can occur legitimately.
+
+For analysis, load `books_full.parquet`, not `books.parquet`: it is a superset of the flat columns without `marc_json` (98 MB, ~0.2 s) and adds `contributor_records` (relator code, name parts, GND ID, parsed date range), `subjects_structured`, `name_authority_ids` and `authority_ids`. Keep `books.parquet` for the raw MARC and for provenance. `contributors.parquet` is the long table for grouping and joins. Two traps: `contributors` (flat name strings) and `contributor_records` (structs) are different columns, and `contributors` already contains `authors` and `editors`, so never sum the three.
 
 ## Validation and analysis handoff
 
@@ -116,7 +120,7 @@ Load the completed table:
 ```python
 import pandas as pd
 
-df = pd.read_parquet("data/k10plus/books.parquet", dtype_backend="pyarrow")
+df = pd.read_parquet("data/k10plus/books_full.parquet", dtype_backend="pyarrow")
 assert df.record_id.is_unique
 ```
 

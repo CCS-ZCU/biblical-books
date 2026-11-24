@@ -27,7 +27,13 @@ This makes one sequential request per query and prints the count and an example.
 ```bash
 biblical-books harvest
 biblical-books export
+biblical-books derive
 ```
+
+`derive` is offline and optional: it re-reads the stored MARC and writes `books_full.parquet` plus a
+`contributors.parquet` long table with structured names, relator roles, parsed life dates and GND
+identifiers. See [`DERIVATION.md`](DERIVATION.md). It can be re-run at any time; `export` output is
+left untouched.
 
 Run `harvest` again to resume; committed pages are skipped. Run `export` again to update the Parquet files. Stop with Ctrl-C between requests; the current SQLite transaction is atomic. **Run one harvester at a time per data directory.** The default is 100 records/request with a one-second pause, plus retry/backoff for 429 and transient server errors. At hundreds of thousands of records this can take hours. Follow provider restrictions, and consult the service team if rate limits or result-window limits appear; never silently regard a truncated query as complete.
 
@@ -82,10 +88,15 @@ df = pd.read_parquet("data/k10plus/books.parquet",
 - `status.json`, `export.json`: completion status, advertised counts, export counts and schema.
 - `records.parquet`: one row per K10plus record ID in the search union.
 - `books.parquet`: subset marked `is_textual_monograph`.
+- `books_full.parquet`: `books.parquet` plus derived columns — `contributor_records`, `contributor_types`, `subjects_structured`, `name_authority_ids`, `authority_ids` and a corrected `subject_authority_ids`; `marc_json` omitted (add `derive --keep-marc-json` to retain it).
+- `contributors.parquet`: one row per (record, name field) with relator code, name parts, dates and GND ID.
+- `derive.json`: manifest of the derivation, including date-parsing statistics.
 
 Scalar columns: `record_id`, `source_url`, `title`, `subtitle`, `full_title`, `responsibility`, `publication_year` (nullable), `date_text`, `date_type`, `publication_statement`, `edition`, `extent`, `abstract`, `leader`, `record_type`, `bibliographic_level`, `is_textual_monograph`, `first_seen`, `last_seen`.
 
 Repeated metadata are genuine list columns: `authors` (main-entry names), `editors` (explicit editor roles only), `contributors`, `languages`, `isbns`, `issns`, `dois`, `publishers`, `publication_places`, `subjects`, `subject_authority_ids`, `ddc`, `lcc`, `other_classifications`, `series`, `urls`, `related_record_ids`, `notes`, `matched_queries`.
+
+In `books_full.parquet`, `authors`/`editors`/`contributors` keep their meaning (flat name strings, now generated from the structured derivation and therefore without the `$d` dates), while `contributor_records` carries the structured form: relator code, inverted-name parts, added terms, GND ID and parsed date range per contributor. `contributors` (flat names) and `contributor_records` (structs) are different columns by design. Because `contributors` is already a superset of `authors` and `editors`, never sum the three.
 
 `marc_json` preserves the MARC leader, all controlfields, indicators and ordered repeated subfields. Original bytes remain in raw responses. The MARC export is a provider conversion from K10plus PICA; losslessness here refers to the returned MARC, not to all underlying PICA/local holdings data.
 

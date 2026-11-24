@@ -205,6 +205,8 @@ not re-parse the archived XML.
 .venv/bin/biblical-books harvest      # resumable; ~10 h for this selection at 100 records/request
 .venv/bin/biblical-books status
 .venv/bin/biblical-books export
+.venv/bin/biblical-books derive       # offline: structured contributors, dates, authority IDs
 ```
 
-`scripts/explore_k10plus.ipynb` reproduces every number in this document from the exported files.
+`scripts/explore_k10plus.ipynb` reproduces every number in this document from the exported files, and
+loads `books_full.parquet` — the machine-readable frame written by `derive` (see `DERIVATION.md`).

@@ -248,6 +248,100 @@ def export(args):
     LOG.info("Exported %s candidates and %s textual monographs", count, book_count)
 
 
+def derive(args):
+    """Write books_full.parquet and contributors.parquet from the stored MARC JSON.
+
+    Offline and repeatable: it reads the ``marc_json`` column already exported, so no network access
+    and no re-harvest are involved. Row groups are processed one at a time, so memory stays bounded
+    even though ``marc_json`` would be several gigabytes if materialised.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from .derive import CONTRIBUTORS_SCHEMA, books_schema, derive as derive_record
+
+    source = args.data_dir / "books.parquet"
+    if not source.exists():
+        raise ValueError(f"{source} not found; run `biblical-books export` first")
+
+    manifest_path = args.data_dir / "export.json"
+    export_manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+    schema = books_schema(keep_marc_json=args.keep_marc_json)
+
+    books_path = args.data_dir / "books_full.parquet"
+    contributors_path = args.data_dir / "contributors.parquet"
+    books_temp = books_path.with_suffix(".parquet.tmp")
+    contributors_temp = contributors_path.with_suffix(".parquet.tmp")
+
+    stats = {"records": 0, "contributors": 0, "with_gnd_name": 0, "with_gnd_subject": 0,
+             "dates_total": 0, "dates_parsed": 0, "dates_unparsed": 0, "precision": {},
+             "unparsed_examples": []}
+    parquet_file = pq.ParquetFile(source)
+    try:
+        with pq.ParquetWriter(books_temp, schema, compression="zstd") as writer, \
+                pq.ParquetWriter(contributors_temp, CONTRIBUTORS_SCHEMA, compression="zstd") as contributor_writer:
+            for group in range(parquet_file.num_row_groups):
+                rows = parquet_file.read_row_group(group).to_pylist()
+                for row in rows:
+                    derived = derive_record(row.pop("marc_json"))
+                    row.update({key: derived[key] for key in
+                                ("contributor_types", "name_authority_ids", "authority_ids",
+                                 "contributor_records", "subjects_structured",
+                                 "subject_authority_ids")})
+                    # Keep the compat lists consistent with the structured derivation.
+                    for name in ("authors", "editors", "contributors"):
+                        row[name] = derived[name]
+
+                    stats["records"] += 1
+                    stats["contributors"] += len(derived["contributor_records"])
+                    stats["with_gnd_name"] += bool(derived["name_authority_ids"])
+                    stats["with_gnd_subject"] += bool(derived["subject_authority_ids"])
+                    for contributor in derived["contributor_records"]:
+                        if not contributor["date_text"]:
+                            continue
+                        stats["dates_total"] += 1
+                        if contributor["date_earliest"] is None and contributor["date_latest"] is None:
+                            stats["dates_unparsed"] += 1
+                            if len(stats["unparsed_examples"]) < 25:
+                                stats["unparsed_examples"].append(contributor["date_text"])
+                        else:
+                            stats["dates_parsed"] += 1
+                        precision = contributor["date_precision"] or "none"
+                        stats["precision"][precision] = stats["precision"].get(precision, 0) + 1
+                writer.write_table(pa.Table.from_pylist(
+                    [{name: row.get(name) for name in schema.names} for row in rows], schema=schema))
+                long_rows = []
+                for row in rows:
+                    for contributor in row["contributor_records"]:
+                        long_rows.append({"record_id": row["record_id"], **contributor,
+                                          "publication_year": row.get("publication_year")})
+                if long_rows:
+                    contributor_writer.write_table(pa.Table.from_pylist(long_rows, schema=CONTRIBUTORS_SCHEMA))
+                LOG.info("derived row group %s/%s: %s records, %s contributors so far",
+                         group + 1, parquet_file.num_row_groups, stats["records"], stats["contributors"])
+        books_temp.replace(books_path)
+        contributors_temp.replace(contributors_path)
+    finally:
+        books_temp.unlink(missing_ok=True)
+        contributors_temp.unlink(missing_ok=True)
+
+    manifest = {
+        "derived_at": now(),
+        "source": {"books": str(source.name), "exported_at": export_manifest.get("exported_at"),
+                   "records": export_manifest.get("textual_monographs")},
+        "outputs": {"books": books_path.name, "contributors": contributors_path.name,
+                    "books_columns": schema.names},
+        "keep_marc_json": bool(args.keep_marc_json),
+        "stats": stats,
+    }
+    (args.data_dir / "derive.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+    LOG.info("Derived %s records and %s contributor rows into %s and %s",
+             stats["records"], stats["contributors"], books_path.name, contributors_path.name)
+    print(json.dumps({key: stats[key] for key in ("records", "contributors", "with_gnd_name",
+                                                 "with_gnd_subject", "dates_total", "dates_parsed",
+                                                 "dates_unparsed", "precision")}, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path("config/queries.json"))
@@ -263,6 +357,9 @@ def main():
     sub.add_parser("status")
     out = sub.add_parser("export")
     out.add_argument("--batch-size", type=int, default=5000)
+    rich = sub.add_parser("derive", help="Derive structured contributors, dates and authority IDs offline")
+    rich.add_argument("--keep-marc-json", action="store_true",
+                      help="Retain marc_json in books_full.parquet (adds ~2.7 GB in memory when loaded)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     try:
@@ -281,6 +378,8 @@ def main():
             if args.batch_size < 1:
                 raise ValueError("batch-size must be positive")
             export(args)
+        elif args.command == "derive":
+            derive(args)
         else:
             status(args)
     except (ValueError, RuntimeError, requests.RequestException, ET.ParseError) as exc:
