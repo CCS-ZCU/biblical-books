@@ -90,7 +90,8 @@ df = pd.read_parquet("data/k10plus/books.parquet",
 - `books.parquet`: subset marked `is_textual_monograph`.
 - `books_full.parquet`: `books.parquet` plus derived columns — `contributor_records`, `contributor_types`, `subjects_structured`, `name_authority_ids`, `authority_ids` and a corrected `subject_authority_ids`; `marc_json` omitted (add `derive --keep-marc-json` to retain it).
 - `contributors.parquet`: one row per (record, name field) with relator code, name parts, dates and GND ID.
-- `derive.json`: manifest of the derivation, including date-parsing statistics.
+- `subject_concepts.parquet`: the subject concept map — `gnd_id`, a bilingual label such as `Bibel / Bible`, and the observed heading variants.
+- `derive.json`: manifest of the derivation, including date-parsing statistics and the concept-map summary.
 
 Scalar columns: `record_id`, `source_url`, `title`, `subtitle`, `full_title`, `responsibility`, `publication_year` (nullable), `date_text`, `date_type`, `publication_statement`, `edition`, `extent`, `abstract`, `leader`, `record_type`, `bibliographic_level`, `is_textual_monograph`, `first_seen`, `last_seen`.
 

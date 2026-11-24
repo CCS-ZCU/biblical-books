@@ -32,7 +32,8 @@ read. Nothing was lost — it is all in `marc_json` — but it was not machine-r
 |---|---|---|
 | `books_full.parquet` | 300,542 | `books.parquet` plus the derived columns; `marc_json` omitted |
 | `contributors.parquet` | 492,785 | one row per (record, name field) — the long table |
-| `derive.json` | — | manifest: inputs, counts, date-parsing statistics |
+| `subject_concepts.parquet` | 88,938 | the concept map: `gnd_id` ⟷ bilingual label ⟷ observed variants |
+| `derive.json` | — | manifest: inputs, counts, date-parsing statistics, concept-map summary |
 
 `books.parquet` and `records.parquet` are unchanged, so existing analysis and the provenance chain
 still work. `books_full` is a strict **superset** of `books` (plus derived columns, minus
@@ -47,7 +48,7 @@ Loading cost, measured in the notebook kernel: **0.2 s** for `books_full.parquet
 |---|---|---|
 | `contributor_records` | `list<struct>` | every name field, structured — see below |
 | `contributor_types` | `list<string>` | the relator codes present, e.g. `["aut","edt"]` — cheap filtering |
-| `subjects_structured` | `list<struct>` | subjects with heading/subdivision split and their authority IDs |
+| `subjects_structured` | `list<struct>` | subjects with heading/subdivision split, `entity_type`, `concept_id`/`concept_label` and their authority IDs |
 | `name_authority_ids` | `list<string>` | GND IDs taken from name fields (the gap that was missing) |
 | `authority_ids` | `list<string>` | union of name and subject GND IDs, deduplicated |
 | `subject_authority_ids` | `list<string>` | **corrected**: now includes the `689` GND chain |
@@ -81,6 +82,24 @@ related_work_title  $t, when the 700 carries a related work rather than a person
 
 `contributors.parquet` is the same fields flattened, keyed by `record_id`, with `publication_year`
 carried along for convenience.
+
+### `subjects_structured` structure
+
+```
+sequence            position among the record's subject fields
+marc_tag            689 (GND chain) or 600/610/611/630/648/650/651 (LCSH-style)
+entity_type         $D: s topic, u work, p person, g place, b corporate body, f event
+scheme              $2, e.g. "gnd"; null when the record states none
+gnd_id, gnd_uri     $0 (DE-588)…  and https://d-nb.info/gnd/<id>
+heading             $a $b $c $d $t $n $p — the thing itself
+subdivisions        $x $y $z $v — the facets applied to it
+authority_ids       every $0 verbatim (GND, RVK, bibliographic)
+concept_id          shared identity: "gnd:<id>" or "heading:<normalised>"
+concept_label       display label, "Bibel / Bible" when an alias was learned
+full                all subfields joined, minus $0/$2/$5/$6/$8
+```
+
+Heading-less shells (`689` carrying only `$5`) are dropped, so every row has content.
 
 ## Decisions, and the evidence for them
 
@@ -144,10 +163,102 @@ VIAF identifier would have to come from a GND→VIAF concordance outside this ca
 **No work-level grouping and no filtering.** `books_full` keeps one row per catalogue record, as
 before. Filtering is the analysis's job; this step only makes the fields addressable.
 
+## The two-vocabulary problem, and the concept map
+
+The same concept is catalogued twice, in German (GND, field `689`) and in English (LCSH, fields
+`600`–`651`):
+
+| German | occurrences | English | occurrences |
+|---|---|---|---|
+| Bibel | 49,618 | Bible | 37,369 |
+| Bibel Altes Testament | 41,481 | Bible Old Testament | 7,614 |
+| Bibel Neues Testament | 43,439 | Bible New Testament | 4,603 |
+| Exegese | 65,585 | Exegesis | 66 |
+| Theologie | 60,066 | Theology | 1,609 |
+
+A naive top-20 therefore splits every central concept in two — and the split is **time- and
+library-dependent**, because German cataloguing dominates older and continental records while
+English headings dominate newer and Anglo-American ones. Any "subject vocabulary changed over time"
+finding that ignores this may be measuring which network catalogued the book.
+
+**A pure GND merge is impossible.** LCSH rows carry no identifier at all: `Bible`, `Bible Old
+Testament` and `Exegesis` rows have an empty `gnd_id`, so the two vocabularies cannot be joined on
+an ID. Every GND id observed in this corpus maps to exactly one German heading — the identifier
+disambiguates nothing on the English side.
+
+**What works is learning the equivalence from the catalogue itself.** Some records carry both
+vocabularies, and a record with *exactly one* GND subject and *exactly one* identifier-less heading
+is an unambiguous witness. There are 3,104 such records, giving high-precision pairs:
+
+```
+86  4006406-2 <-> Bible            48  4073055-4 <-> Bible Revelation
+62  4028700-2 <-> Bible John       44  4038001-4 <-> Bible Matthew
+61  4037658-8 <-> Bible Mark       42  4036616-9 <-> Bible Luke
+59  4041771-2 <-> Bible New Testament
+```
+
+A pair is accepted only when it is supported by at least 3 witnesses **and** beats the runner-up by
+a factor of 2 (`ConceptMap.MIN_SUPPORT`, `ConceptMap.DOMINANCE`), which keeps co-occurrence noise out:
+`Bibel` genuinely appears next to `Hermeneutik` and `Exegese` 638 and 531 times, but those are related
+concepts, not translations. 113 aliases pass the test, and because several English headings can point
+at one identifier, **88 GND concepts** end up with a bilingual label (reported as
+`bilingual_labels` in `derive.json`).
+
+### Result
+
+`subjects_structured` now carries `concept_id` and `concept_label`, and grouping by them collapses the
+split:
+
+| by heading (before) | | by concept (after) | |
+|---|---|---|---|
+| Bibel | 49,618 | **Bibel / Bible** | **82,222** |
+| Bible | 37,369 | | |
+| Bibel Neues Testament | 43,439 | **Bibel Neues Testament / Bible New Testament** | **50,000** |
+| Bibel Altes Testament | 41,481 | **Bibel Altes Testament / Bible Old Testament** | **48,028** |
+
+73.8% of subject rows now carry a GND-backed concept id. Group by `concept_id` for statistics (it is
+stable), `concept_label` for display (it is human-readable).
+
+### `subject_concepts.parquet`
+
+The map as a table — one row per concept, the format requested as "gnd_id ⟷ Bibel/Bible":
+
+| column | meaning |
+|---|---|
+| `concept_id` | `gnd:4006406-2` or `heading:bible` when no identifier exists |
+| `label` | `Bibel / Bible`, or the single heading |
+| `gnd_id` | the identifier, or null |
+| `records_with_gnd` | records where this ID appeared (alias support context) |
+| `occurrences` | subject rows in the corpus |
+| `variants` | every heading spelling observed for the concept, most frequent first |
+
+88,938 concepts: 27,259 GND-backed, 61,679 heading-only, of which 88 carry a bilingual label. Do not
+count slashes to find them: 1,209 labels contain ` / ` because German headings themselves do
+(`Bibel / Lexikon, Wörterbuch`); use `bilingual_labels` in `derive.json` or the `aliases` produced by
+`ConceptMap.summary()`.
+
+**Honest limit:** the map is learned, so it is *not* a complete German–English dictionary. 61,679
+concepts remain heading-only because no record ever paired them with an identifier. Treat
+`concept_label` as a reading aid and report the alias support when a merge matters.
+
+## Two catalogue quirks this step now fixes
+
+**Heading-less `689` shells are dropped.** K10plus writes a second, empty `689` containing only
+`$5 (DE-627)` beside the real chain. Those carried no content but accounted for **258,112 of
+1,655,617 subject rows (15.6%)**, inflating both per-record subject counts and any heading
+frequency. They are now skipped at derivation time, so `subject_rows` = 1,397,505 and every count is
+directly interpretable. Legacy `subjects` (flat strings) is unaffected.
+
+**The `$D` entity marker is now a field.** `689` states what the chain is about — `s` topic, `u`
+work, `p` person, `g` place, `b` corporate body — which previously survived only as the first
+character of `full`. It is now `entity_type`, so "themes vs works vs people" is a plain `groupby`
+instead of string slicing. Distribution: `s` 431,173 · `u` 259,055 · `p` 39,099 · `g` 18,565 ·
+`b` 3,745 · `f` 147.
+
 ## Reproducing and checking
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -v   # 17 tests, incl. 11 for this step
+.venv/bin/python -m unittest discover -s tests -v   # 22 tests, incl. 17 for this step
 .venv/bin/biblical-books derive
 cat data/k10plus/derive.json                        # counts and date statistics
 ```

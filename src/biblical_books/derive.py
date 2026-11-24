@@ -1,5 +1,4 @@
 """Machine-readable derivation of contributors, dates and authority identifiers.
-
 Input is the ``marc_json`` payload that :func:`biblical_books.export` already stored, so this step
 needs **no network access and no re-harvest**: it can be re-run at any time, and its output can be
 regenerated from the same evidence.
@@ -47,6 +46,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 
 import pyarrow as pa
 
@@ -57,6 +57,8 @@ PRIMARY_NAME_TAGS = {"100", "110", "111"}
 CORPORATE_TAGS = {"110", "111", "710", "711"}
 SUBJECT_TAGS = ("600", "610", "611", "630", "648", "650", "651")
 CHAIN_TAG = "689"
+# Headings that are already American-style even when they arrive without an identifier.
+LCSH_TAGS = {"600", "610", "611", "630", "650", "651"}
 GND_URI_PREFIX = "https://d-nb.info/gnd/"
 
 # Relator codes occurring in this corpus, most frequent first (see DERIVATION.md).
@@ -249,21 +251,41 @@ def contributor_row(field: dict, sequence: int) -> dict:
     }
 
 
-def subject_row(field: dict, sequence: int) -> dict:
-    """Turn one MARC subject field into a flat row with its authority identifiers."""
+def normalize_heading(heading: str | None) -> str | None:
+    """Comparison key for a heading: casefolded, punctuation removed, whitespace collapsed."""
+    if not heading:
+        return None
+    text = re.sub(r"[\W_]+", " ", heading.casefold(), flags=re.UNICODE)
+    return " ".join(text.split()) or None
+
+
+def subject_row(field: dict, sequence: int) -> dict | None:
+    """Turn one MARC subject field into a flat row, or None for a heading-less shell.
+
+    K10plus writes a second, empty ``689`` containing only ``$5 (DE-627)`` next to the real chain.
+    Those shells carry no content, so keeping them would inflate every subject count by ~15%.
+    """
     subfields = field.get("subfields", [])
+    heading = " ".join(_values(subfields, {"a", "b", "c", "d", "t", "n", "p"})) or None
+    if not heading:
+        return None
     authority = _values(subfields, {"0"})
     gnd_id = next((gnd_of(value) for value in authority if gnd_of(value)), None)
     scheme = _first(subfields, {"2"}) or next((scheme_of(value) for value in authority if scheme_of(value)), None)
+    # $D states what kind of entity the chain is about: s topic, u work, p person, g place, b body.
+    entity_type = _first(subfields, {"D"})
     return {
         "sequence": sequence,
         "marc_tag": field.get("tag", ""),
+        "entity_type": entity_type,
         "scheme": scheme,
         "gnd_id": gnd_id,
         "gnd_uri": GND_URI_PREFIX + gnd_id if gnd_id else None,
-        "heading": " ".join(_values(subfields, {"a", "b", "c", "d", "t", "n", "p"})) or None,
+        "heading": heading,
         "subdivisions": _values(subfields, {"x", "y", "z", "v"}),
         "authority_ids": authority,
+        # Provisional identity; `concepts` may replace it with a GND-backed id (see ConceptMap).
+        "concept_id": f"gnd:{gnd_id}" if gnd_id else f"heading:{normalize_heading(heading)}",
         "full": " ".join(item["value"].strip() for item in subfields
                          if item.get("code") not in {"0", "2", "5", "6", "8"}).strip() or None,
     }
@@ -277,8 +299,12 @@ def is_editor(row: dict) -> bool:
     return any(word in text for word in EDITOR_WORDS)
 
 
-def derive(marc_json: str) -> dict:
-    """Derive all machine-readable columns for one record."""
+def derive(marc_json: str, concepts: "ConceptMap | None" = None) -> dict:
+    """Derive all machine-readable columns for one record.
+
+    ``concepts`` optionally maps a heading without a GND identifier onto the identifier learned
+    from the catalogue itself, which is what merges ``Bibel`` and ``Bible`` into one concept.
+    """
     fields = json.loads(marc_json)["fields"]
 
     contributors, subjects = [], []
@@ -289,7 +315,16 @@ def derive(marc_json: str) -> dict:
         if tag in NAME_TAGS:
             contributors.append(contributor_row(field, len(contributors) + 1))
         elif tag in SUBJECT_TAGS or tag == CHAIN_TAG:
-            subjects.append(subject_row(field, len(subjects) + 1))
+            row = subject_row(field, len(subjects) + 1)
+            if row is not None:
+                subjects.append(row)
+
+    if concepts is not None:
+        subjects = concepts.apply(subjects)
+    else:
+        # Without a learned map the label is simply the catalogued heading.
+        for row in subjects:
+            row["concept_label"] = row["heading"]
 
     names = [row["name_as_catalogued"] for row in contributors if row["name_as_catalogued"]]
     primary = [row["name_as_catalogued"] for row in contributors
@@ -314,6 +349,119 @@ def derive(marc_json: str) -> dict:
         "subject_authority_ids": unique(subject_authority),
         "authority_ids": unique(name_authority + subject_authority),
     }
+
+
+class ConceptMap:
+    """Merge the German (GND) and English (LCSH) vocabularies into one identity per concept.
+
+    The problem this solves: the same concept is catalogued twice — ``Bibel`` 49,618 rows and
+    ``Bible`` 37,369 — so a naive top-20 splits every central concept in two, and the split is
+    *time- and library-dependent* because German cataloguing dominates older and continental records
+    while English headings dominate newer and Anglo-American ones.
+
+    A pure GND merge is impossible: LCSH rows carry **no** identifier at all (``Bible`` and
+    ``Exegesis`` rows have empty ``gnd_id``). But the catalogue contains records that carry both
+    vocabularies, and a record with exactly one GND subject and exactly one id-less heading is an
+    unambiguous witness. Those witnesses give high-precision pairs (``4006406-2 <-> Bible``,
+    ``4028700-2 <-> Bible John``, …). They are counted here, and only a mutual best pair with
+    enough support is accepted, so co-occurrence noise (``Bibel`` next to ``Hermeneutik``) is not
+    mistaken for equivalence.
+
+    ``apply`` then gives every subject row a ``concept_id`` (the GND identifier where known, shared
+    by both vocabularies) and a ``concept_label`` such as ``"Bibel / Bible"``.
+    """
+
+    # Minimum witnesses before an English heading is aliased onto a GND identifier.
+    MIN_SUPPORT = 3
+    # An alias must also beat the runner-up by this factor to count as mutual best.
+    DOMINANCE = 2.0
+
+    def __init__(self) -> None:
+        self.heading_counts: dict[str, Counter] = {}
+        self.records: Counter = Counter()
+        self.pairs: Counter = Counter()
+        self.labels: dict[str, str] = {}
+        self.aliases: dict[str, tuple[str, int]] = {}
+        # Number of concepts whose label became bilingual through a learned alias.
+        self.bilingual = 0
+
+    def observe(self, record_id: str, subjects: list[dict]) -> None:
+        """Accumulate the statistics needed to build the map (pass 1)."""
+        by_gnd, by_heading = set(), set()
+        for row in subjects:
+            heading = row["heading"]
+            self.heading_counts.setdefault(row["concept_id"], Counter())[heading] += 1
+            if row["gnd_id"]:
+                by_gnd.add(row["gnd_id"])
+            elif row["marc_tag"] in LCSH_TAGS:
+                by_heading.add(heading)
+        for gnd_id in by_gnd:
+            self.records[gnd_id] += 1
+        if len(by_gnd) == 1 and len(by_heading) == 1:
+            self.pairs[(next(iter(by_gnd)), next(iter(by_heading)))] += 1
+
+    def build(self) -> None:
+        """Turn the accumulated statistics into labels and aliases (after pass 1)."""
+        base = {concept_id: counts.most_common(1)[0][0]
+                for concept_id, counts in self.heading_counts.items()}
+
+        best_for_heading: dict[str, list[tuple[int, str]]] = {}
+        for (gnd_id, heading), support in self.pairs.items():
+            best_for_heading.setdefault(heading, []).append((support, gnd_id))
+        best_alias: dict[str, tuple[int, str]] = {}
+        for heading, candidates in best_for_heading.items():
+            candidates.sort(reverse=True)
+            support, gnd_id = candidates[0]
+            runner_up = candidates[1][0] if len(candidates) > 1 else 0
+            if support >= self.MIN_SUPPORT and support >= self.DOMINANCE * max(runner_up, 1):
+                self.aliases[heading] = (gnd_id, support)
+                # Only the strongest witness becomes the label; several headings may alias one id.
+                if gnd_id not in best_alias or support > best_alias[gnd_id][0]:
+                    best_alias[gnd_id] = (support, heading)
+
+        for gnd_id, (_support, heading) in best_alias.items():
+            concept_id = f"gnd:{gnd_id}"
+            german = base.get(concept_id)
+            # A learned English twin joins the German label: "Bibel / Bible".
+            if german and german != heading:
+                self.labels[concept_id] = f"{german} / {heading}"
+                self.bilingual += 1
+        for concept_id, label in base.items():
+            self.labels.setdefault(concept_id, label)
+
+    def apply(self, subjects: list[dict]) -> list[dict]:
+        """Point subject rows at the shared concept identity and label."""
+        for row in subjects:
+            heading = row["heading"]
+            if not row["gnd_id"] and heading in self.aliases:
+                row["concept_id"] = f"gnd:{self.aliases[heading][0]}"
+            row["concept_label"] = self.labels.get(row["concept_id"], heading)
+        return subjects
+
+    def table(self) -> list[dict]:
+        """One row per concept, for ``subject_concepts.parquet``."""
+        return [
+            {
+                "concept_id": concept_id,
+                "label": label,
+                "gnd_id": concept_id.split(":", 1)[1] if concept_id.startswith("gnd:") else None,
+                "records_with_gnd": self.records.get(concept_id.split(":", 1)[1], 0)
+                if concept_id.startswith("gnd:") else 0,
+                "occurrences": sum(counts.values()),
+                "variants": [heading for heading, _ in counts.most_common()],
+            }
+            for concept_id, counts in self.heading_counts.items()
+            for label in [self.labels.get(concept_id, next(iter(counts)))]
+        ]
+
+    def summary(self) -> dict:
+        return {
+            "concepts": len(self.heading_counts),
+            "gnd_concepts": sum(1 for key in self.heading_counts if key.startswith("gnd:")),
+            "heading_concepts": sum(1 for key in self.heading_counts if key.startswith("heading:")),
+            "learned_aliases": len(self.aliases),
+            "bilingual_labels": self.bilingual,
+        }
 
 
 # --------------------------------------------------------------------------------------------
@@ -350,13 +498,25 @@ CONTRIBUTOR_STRUCT = pa.struct([
 SUBJECT_STRUCT = pa.struct([
     ("sequence", pa.int32()),
     ("marc_tag", pa.string()),
+    ("entity_type", pa.string()),
     ("scheme", pa.string()),
     ("gnd_id", pa.string()),
     ("gnd_uri", pa.string()),
     ("heading", pa.string()),
     ("subdivisions", pa.list_(pa.string())),
     ("authority_ids", pa.list_(pa.string())),
+    ("concept_id", pa.string()),
+    ("concept_label", pa.string()),
     ("full", pa.string()),
+])
+
+CONCEPT_SCHEMA = pa.schema([
+    ("concept_id", pa.string()),
+    ("label", pa.string()),
+    ("gnd_id", pa.string()),
+    ("records_with_gnd", pa.int32()),
+    ("occurrences", pa.int32()),
+    ("variants", pa.list_(pa.string())),
 ])
 
 DERIVED_COLUMNS = [

@@ -150,6 +150,70 @@ class DeriveTests(unittest.TestCase):
         # the structured column must not collide with the flat contributor list
         self.assertNotEqual(schema.field("contributors").type, schema.field("contributor_records").type)
 
+    def test_headingless_689_shells_are_dropped(self):
+        marc = {"leader": "x", "fields": [
+            {"tag": "689", "ind1": "0", "ind2": "0", "subfields": [
+                {"code": "D", "value": "u"}, {"code": "0", "value": "(DE-588)4006406-2"},
+                {"code": "a", "value": "Bibel"}, {"code": "2", "value": "gnd"}]},
+            {"tag": "689", "ind1": "0", "ind2": " ", "subfields": [{"code": "5", "value": "(DE-627)"}]},
+        ]}
+        row = derive.derive(json.dumps(marc))
+        # the empty shell carries no heading and must not become a subject
+        self.assertEqual(len(row["subjects_structured"]), 1)
+        self.assertEqual(row["subjects_structured"][0]["heading"], "Bibel")
+
+    def test_entity_type_comes_from_the_chain_marker(self):
+        rows = self.row["subjects_structured"]
+        chain = next(r for r in rows if r["marc_tag"] == "689")
+        self.assertEqual(chain["entity_type"], "u")
+        self.assertIsNone(next(r for r in rows if r["marc_tag"] == "650")["entity_type"])
+
+    def test_concept_id_falls_back_to_the_normalised_heading(self):
+        rows = self.row["subjects_structured"]
+        bible = next(r for r in rows if r["gnd_id"] == "4006406-2")
+        self.assertEqual(bible["concept_id"], "gnd:4006406-2")
+        self.assertEqual(bible["concept_label"], "Bibel")
+        self.assertEqual(derive.normalize_heading("Bible  O.T.,  "), "bible o t")
+
+    def test_concept_map_merges_german_and_english_labels(self):
+        """The map is learned from records that carry both vocabularies."""
+        concept_map = derive.ConceptMap()
+        # witnesses: one GND subject and one identifier-less English heading in the same record
+        for i in range(derive.ConceptMap.MIN_SUPPORT + 2):
+            concept_map.observe(f"rec{i}", [
+                {"heading": "Bibel", "gnd_id": "4006406-2", "marc_tag": "689",
+                 "concept_id": "gnd:4006406-2"},
+                {"heading": "Bible", "gnd_id": None, "marc_tag": "650",
+                 "concept_id": "heading:bible"},
+            ])
+        # a single co-occurrence must NOT be treated as an equivalence
+        concept_map.observe("recOther", [
+            {"heading": "Bibel", "gnd_id": "4006406-2", "marc_tag": "689",
+             "concept_id": "gnd:4006406-2"},
+            {"heading": "Hermeneutik", "gnd_id": None, "marc_tag": "650",
+             "concept_id": "heading:hermeneutik"},
+        ])
+        concept_map.build()
+
+        rows = concept_map.apply([
+            {"heading": "Bible", "gnd_id": None, "marc_tag": "650", "concept_id": "heading:bible"},
+            {"heading": "Hermeneutik", "gnd_id": None, "marc_tag": "650",
+             "concept_id": "heading:hermeneutik"},
+        ])
+        self.assertEqual(rows[0]["concept_id"], "gnd:4006406-2")
+        self.assertEqual(rows[0]["concept_label"], "Bibel / Bible")
+        # not enough support: stays its own concept
+        self.assertEqual(rows[1]["concept_id"], "heading:hermeneutik")
+        self.assertEqual(concept_map.summary()["learned_aliases"], 1)
+
+    def test_concept_map_rejects_a_concept_without_identifiers(self):
+        concept_map = derive.ConceptMap()
+        concept_map.observe("rec1", [{"heading": "Bible", "gnd_id": None, "marc_tag": "650",
+                                      "concept_id": "heading:bible"}])
+        concept_map.build()
+        self.assertEqual(concept_map.summary()["learned_aliases"], 0)
+        self.assertEqual(concept_map.summary()["heading_concepts"], 1)
+
     def test_schema_is_a_superset_of_the_exported_book_columns(self):
         # `export` writes date_type/first_seen/last_seen outside STRING_COLUMNS; a missing one here
         # would silently break notebook cells that read them.
