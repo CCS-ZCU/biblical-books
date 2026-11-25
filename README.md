@@ -2,6 +2,8 @@
 
 A reproducible, resumable extraction of **Biblical Studies candidate records from K10plus**, with a pandas-ready Parquet bibliography. No date or language restrictions are imposed by default. Monographs and edited volumes are included. The configuration is deliberately broad; it does **not** establish that every candidate is academic scholarship or that all Biblical Studies books worldwide have been found.
 
+**The harvest is complete**: all nine configured searches finished on 2026-11-18, giving **525,205 distinct candidate records**, of which **300,542 are textual monographs**. See [`EXTRACTION.md`](EXTRACTION.md) for what that does and does not mean.
+
 ## Setup
 
 ```bash
@@ -23,6 +25,22 @@ Python 3.11+; dependencies are requests, pandas and pyarrow. `requirements.lock.
 | [`NOTEBOOKS.md`](NOTEBOOKS.md) | the three analysis notebooks, their filtering decisions, dependencies and known pitfalls |
 | [`VALIDATION.md`](VALIDATION.md) | live checks: pipeline mechanics and the completed full harvest |
 | [`AGENTS.md`](AGENTS.md) | operating handoff: setup, harvest/recovery procedure, conventions |
+
+## Licence and citation
+
+Two different things are licensed here, and they are not the same:
+
+| what | licence |
+|---|---|
+| code and documentation (`src/`, `scripts/`, `tests/`, `*.md`) | **CC BY-SA 4.0** — see [`LICENSE.md`](LICENSE.md) |
+| K10plus metadata and every derived table (`books.parquet`, `books_full.parquet`, `contributors.parquet`, `subject_concepts.parquet`) | **CC0**, as published by BSZ, VZG and the participating libraries |
+
+Because the metadata are CC0, a derived bibliography may be redistributed freely; the code that produced it carries the attribution and share-alike terms. Cite the repository via [`CITATION.cff`](CITATION.cff), and state the retrieval date (2026-11-18) and the fact that the result is a candidate set from a live, incomplete catalogue rather than an exhaustive bibliography.
+
+```
+Kaše, Vojtěch. biblical-books: reproducible extraction of a Biblical Studies
+bibliography from K10plus. https://github.com/kasev/biblical-books
+```
 
 ## Check access and selection first
 

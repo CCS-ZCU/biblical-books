@@ -10,9 +10,10 @@ The configured searches identify **candidates**, not a proven exhaustive or acad
 
 ## Current state (harvest complete, 20 November 2026)
 
-- Private repository: https://github.com/kasev/biblical-books
-- Implementation: `src/biblical_books/cli.py` (SRU, checkpoints, export), `src/biblical_books/marc.py` (metadata parsing), `config/queries.json` (selection).
-- Six offline tests pass. See `VALIDATION.md` for the live checks.
+- Public repository: https://github.com/kasev/biblical-books
+- Licence: code and documentation under CC BY-SA 4.0 (`LICENSE.md`); the K10plus metadata and every derived table are CC0, as published by BSZ, VZG and the participating libraries. Citation metadata in `CITATION.cff`.
+- Implementation: `src/biblical_books/cli.py` (SRU, checkpoints, export, derive), `src/biblical_books/marc.py` (MARC parsing), `src/biblical_books/derive.py` (structured contributors, dates, authority IDs, subject concepts), `config/queries.json` (selection).
+- 22 offline tests pass. See `VALIDATION.md` for the live checks.
 - **The full harvest has run and been exported.** All nine queries completed (`selection_complete: true`) on 2026-11-18 between 11:01 and 21:52 UTC: 8,564 pages, 856,135 result positions, **525,205 distinct candidates**, of which **300,542 are textual monographs**. Data on the server at `data/k10plus/` (6.9 GB, including 654 MB of archived raw responses); exported 2026-11-20T15:36:28Z.
 - One `title_biblisch` position is permanently unretrievable and is recorded in the `failures` table.
 - `scripts/1_explore-k10plus.ipynb` documents the result; **`EXTRACTION.md` is the human-readable account** of the source catalogue, the nine searches and their contributions, and the known limitations.
@@ -37,7 +38,7 @@ Changing the configuration, including query descriptions, requires a fresh data 
 
 ## Server setup
 
-Use Python 3.11+ with a virtual environment, Git and HTTPS access to GitHub and `sru.k10plus.de`. A private clone requires GitHub authentication on the server; authentication on the original Mac does not automatically transfer. Use the server's existing credentials, or sign in with GitHub CLI (`gh auth login --hostname github.com --git-protocol https --web`) if installed. Never put access tokens in repository URLs or committed files.
+Use Python 3.11+ with a virtual environment, Git and HTTPS access to GitHub and `sru.k10plus.de`. Cloning the repository needs no GitHub authentication because it is public; pushing does. Use the server's existing credentials, or sign in with GitHub CLI (`gh auth login --hostname github.com --git-protocol https --web`) if installed. Never put access tokens in repository URLs or committed files.
 
 ```bash
 git clone https://github.com/kasev/biblical-books.git

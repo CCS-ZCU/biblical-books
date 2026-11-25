@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this software or the derived dataset, please cite it as below."
+type: software
+title: "biblical-books"
+abstract: >-
+  Reproducible, resumable extraction of Biblical Studies candidate records from the K10plus union
+  catalogue, with a pandas-ready Parquet bibliography. Nine configured searches (DDC 22*, LCC BS*,
+  GND and LCSH subject headings, and English/German/French title supplements) were harvested in full
+  and exported as flat plus machine-readable tables: structured contributors with relator codes,
+  parsed life dates and GND identifiers, and subject concepts merged across the German and English
+  vocabularies. The harvest is not a validated academic corpus; see EXTRACTION.md for coverage,
+  contributions of each search and known limitations.
+authors:
+  - family-names: "Kaše"
+    given-names: "Vojtěch"
+    affiliation: "Department of Philosophy, Faculty of Arts, University of West Bohemia"
+    orcid: "https://orcid.org/0000-0002-6601-1605"
+    website: "https://vojtechkase.cz"
+license: CC-BY-SA-4.0
+repository-code: "https://github.com/kasev/biblical-books"
+keywords:
+  - Biblical Studies
+  - K10plus
+  - library metadata
+  - MARC 21
+  - GND
+  - bibliographic data
+  - collection development
+  - digital humanities
