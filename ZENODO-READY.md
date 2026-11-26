@@ -71,7 +71,7 @@
 | `license` | CC-BY-SA-4.0 | ✓ |
 | `version` | 0.1.0 | ✓ |
 | `date-released` | "2026-11-18" (quoted string) | ✓ |
-| `repository-code` | https://github.com/kasev/biblical-books | ✓ |
+| `repository-code` | https://github.com/kasev/biblical-studies-books-mining | ✓ |
 | `keywords` | 11 items (all single words/short phrases) | ✓ |
 
 ### .zenodo.json (Zenodo schema)
@@ -113,7 +113,7 @@ git push origin v0.1.0
 ```
 
 ### Step 2: Create GitHub Release
-1. Go to: https://github.com/kasev/biblical-books/releases/new
+1. Go to: https://github.com/kasev/biblical-studies-books-mining/releases/new
 2. Select tag: `v0.1.0`
 3. Release title: `v0.1.0: K10plus Biblical Studies Bibliography Harvest`
 4. Copy release notes from [ZENODO-RELEASE.md](ZENODO-RELEASE.md) → "Example: GreLa Integration" section
@@ -221,7 +221,7 @@ After release (copy from CITATION.cff or use Zenodo's auto-generated BibTeX):
   title = {biblical-books: reproducible K10plus harvesting for a Biblical Studies bibliography},
   author = {Kaše, Vojtěch},
   year = {2026},
-  url = {https://github.com/kasev/biblical-books},
+  url = {https://github.com/kasev/biblical-studies-books-mining},
   version = {0.1.0}
 }
 ```
@@ -229,13 +229,13 @@ After release (copy from CITATION.cff or use Zenodo's auto-generated BibTeX):
 **APA:**
 ```
 Kaše, V. (2026). biblical-books: reproducible K10plus harvesting for a Biblical Studies bibliography 
-(Version 0.1.0) [Computer software]. https://github.com/kasev/biblical-books
+(Version 0.1.0) [Computer software]. https://github.com/kasev/biblical-studies-books-mining
 ```
 
 **Chicago:**
 ```
 Kaše, Vojtěch. "biblical-books: reproducible K10plus harvesting for a Biblical Studies bibliography." 
-GitHub, 2026. https://github.com/kasev/biblical-books.
+GitHub, 2026. https://github.com/kasev/biblical-studies-books-mining.
 ```
 
 ---

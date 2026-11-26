@@ -1,5 +1,5 @@
 {
-  "title": "biblical-books: reproducible K10plus harvesting for a Biblical Studies bibliography",
+  "title": "biblical-studies-books-mining: reproducible K10plus harvesting for a Biblical Studies bibliography",
   "upload_type": "software",
   "description": "Reproducible, resumable extraction of Biblical Studies candidate records from the K10plus union catalogue, with pandas-ready Parquet bibliography. Nine configured searches (DDC 22*, LCC BS*, GND and LCSH subject headings, and English/German/French title supplements) were harvested in full and exported as flat plus machine-readable tables: structured contributors with relator codes, parsed life dates and GND identifiers, and subject concepts merged across the German and English vocabularies. The harvest is not a validated academic corpus but a comprehensive candidate set from a live library catalogue. See EXTRACTION.md for coverage, contributions of each search, and known limitations.",
   "creators": [
@@ -36,7 +36,7 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "https://github.com/kasev/biblical-books",
+      "identifier": "https://github.com/kasev/biblical-studies-books-mining",
       "relation": "isSupplementedBy",
       "resource_type": "software"
     }

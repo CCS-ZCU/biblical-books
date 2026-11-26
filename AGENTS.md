@@ -10,7 +10,7 @@ The configured searches identify **candidates**, not a proven exhaustive or acad
 
 ## Current state (harvest complete, 20 November 2026)
 
-- Public repository: https://github.com/kasev/biblical-books
+- Public repository: https://github.com/kasev/biblical-studies-books-mining
 - Licence: code and documentation under CC BY-SA 4.0 (`LICENSE.md`); the K10plus metadata and every derived table are CC0, as published by BSZ, VZG and the participating libraries. Citation metadata in `CITATION.cff`.
 - Implementation: `src/biblical_books/cli.py` (SRU, checkpoints, export, derive), `src/biblical_books/marc.py` (MARC parsing), `src/biblical_books/derive.py` (structured contributors, dates, authority IDs, subject concepts), `config/queries.json` (selection).
 - 22 offline tests pass. See `VALIDATION.md` for the live checks.
@@ -41,7 +41,7 @@ Changing the configuration, including query descriptions, requires a fresh data 
 Use Python 3.11+ with a virtual environment, Git and HTTPS access to GitHub and `sru.k10plus.de`. Cloning the repository needs no GitHub authentication because it is public; pushing does. Use the server's existing credentials, or sign in with GitHub CLI (`gh auth login --hostname github.com --git-protocol https --web`) if installed. Never put access tokens in repository URLs or committed files.
 
 ```bash
-git clone https://github.com/kasev/biblical-books.git
+git clone https://github.com/kasev/biblical-studies-books-mining.git
 cd biblical-books
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .

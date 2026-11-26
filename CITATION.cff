@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software or the derived dataset, please cite it as below."
 type: software
-title: "biblical-books: reproducible K10plus harvesting for a Biblical Studies bibliography"
+title: "biblical-studies-books-mining: reproducible K10plus harvesting for a Biblical Studies bibliography"
 abstract: >-
   Reproducible, resumable extraction of Biblical Studies candidate records from the K10plus union
   catalogue, with pandas-ready Parquet bibliography. Nine configured searches (DDC 22*, LCC BS*,
@@ -17,7 +17,7 @@ authors:
 version: "0.1.0"
 date-released: "2026-11-18"
 license: CC-BY-SA-4.0
-repository-code: "https://github.com/kasev/biblical-books"
+repository-code: "https://github.com/kasev/biblical-studies-books-mining"
 keywords:
   - Biblical Studies
   - K10plus

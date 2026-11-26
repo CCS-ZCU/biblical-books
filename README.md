@@ -1,4 +1,4 @@
-# Biblical books
+# biblical-studies-books-mining
 
 A reproducible, resumable extraction of **Biblical Studies candidate records from K10plus**, with a pandas-ready Parquet bibliography. No date or language restrictions are imposed by default. Monographs and edited volumes are included. The configuration is deliberately broad; it does **not** establish that every candidate is academic scholarship or that all Biblical Studies books worldwide have been found.
 
@@ -39,7 +39,7 @@ Because the metadata are CC0, a derived bibliography may be redistributed freely
 
 ```
 Kaše, Vojtěch. biblical-books: reproducible extraction of a Biblical Studies
-bibliography from K10plus. https://github.com/kasev/biblical-books
+bibliography from K10plus. https://github.com/kasev/biblical-studies-books-mining
 ```
 
 ## Check access and selection first

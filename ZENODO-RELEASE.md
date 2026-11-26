@@ -74,7 +74,7 @@ git push origin v0.1.0
 ```
 
 ### 3. Create a GitHub Release
-1. Go to: https://github.com/kasev/biblical-books/releases/new
+1. Go to: https://github.com/kasev/biblical-studies-books-mining/releases/new
 2. Select tag: `v0.1.0`
 3. Release title: `v0.1.0: K10plus Biblical Studies Bibliography Harvest`
 4. Release notes (copy from below, adapt as needed):
@@ -133,7 +133,7 @@ The metadata are published under CC0 by BSZ, VZG and participating German librar
   title = {biblical-books: reproducible K10plus harvesting for a Biblical Studies bibliography},
   author = {Kaše, Vojtěch},
   year = {2026},
-  url = {https://github.com/kasev/biblical-books},
+  url = {https://github.com/kasev/biblical-studies-books-mining},
   version = {0.1.0}
 }
 ```
@@ -141,7 +141,7 @@ The metadata are published under CC0 by BSZ, VZG and participating German librar
 Or with CITATION.cff:
 ```
 Kaše, V. (2026). biblical-books: reproducible K10plus harvesting for a Biblical Studies 
-bibliography (Version 0.1.0) [Computer software]. https://github.com/kasev/biblical-books
+bibliography (Version 0.1.0) [Computer software]. https://github.com/kasev/biblical-studies-books-mining
 ```
 
 ## Getting Started
@@ -173,7 +173,7 @@ This release is archived on Zenodo with DOI: **[insert DOI after Zenodo publicat
 
 ## Repository
 
-https://github.com/kasev/biblical-books
+https://github.com/kasev/biblical-studies-books-mining
 ```
 
 5. Click "Publish release"

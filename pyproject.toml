@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "biblical-books"
+name = "biblical-studies-books-mining"
 version = "0.1.0"
 description = "Reproducible K10plus harvesting for a Biblical Studies bibliography"
 requires-python = ">=3.11"
@@ -16,9 +16,9 @@ authors = [
 keywords = ["Biblical Studies", "K10plus", "MARC", "bibliography", "digital humanities"]
 
 [project.urls]
-Homepage = "https://github.com/kasev/biblical-books"
-Repository = "https://github.com/kasev/biblical-books"
-Documentation = "https://github.com/kasev/biblical-books/blob/main/EXTRACTION.md"
+Homepage = "https://github.com/kasev/biblical-studies-books-mining"
+Repository = "https://github.com/kasev/biblical-studies-books-mining"
+Documentation = "https://github.com/kasev/biblical-studies-books-mining/blob/main/EXTRACTION.md"
 
 [project.scripts]
 biblical-books = "biblical_books.cli:main"
