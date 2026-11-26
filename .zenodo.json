@@ -36,7 +36,7 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "https://github.com/kasev/biblical-studies-books-mining",
+      "identifier": "https://github.com/CCS-ZCU/biblical-studies-books-mining",
       "relation": "isSupplementedBy",
       "resource_type": "software"
     }
