@@ -1,0 +1,64 @@
+{
+  "title": "biblical-books: reproducible K10plus harvesting for a Biblical Studies bibliography",
+  "upload_type": "software",
+  "description": "Reproducible, resumable extraction of Biblical Studies candidate records from the K10plus union catalogue, with pandas-ready Parquet bibliography. Nine configured searches (DDC 22*, LCC BS*, GND and LCSH subject headings, and English/German/French title supplements) were harvested in full and exported as flat plus machine-readable tables: structured contributors with relator codes, parsed life dates and GND identifiers, and subject concepts merged across the German and English vocabularies. The harvest is not a validated academic corpus but a comprehensive candidate set from a live library catalogue. See EXTRACTION.md for coverage, contributions of each search, and known limitations.",
+  "creators": [
+    {
+      "name": "Kaše, Vojtěch",
+      "affiliation": "Department of Philosophy, Faculty of Arts, University of West Bohemia",
+      "orcid": "0000-0002-6601-1605"
+    }
+  ],
+  "contributors": [],
+  "version": "0.1.0",
+  "language": "en",
+  "keywords": [
+    "biblical studies",
+    "k10plus",
+    "library metadata",
+    "marc 21",
+    "gnd",
+    "bibliographic data",
+    "collection development",
+    "digital humanities",
+    "reproducible research",
+    "bibliography",
+    "catalogue harvesting"
+  ],
+  "license": {
+    "id": "cc-by-sa-4.0"
+  },
+  "access_right": "open",
+  "references": [
+    "K10plus SRU endpoint: https://wiki.k10plus.de/spaces/K10PLUS/pages/27361342/SRU",
+    "K10plus Data Provision: https://wiki.k10plus.de/spaces/K10PLUS/pages/27361297/Datenbereitstellung",
+    "K10plus open data (CC0): https://wiki.k10plus.de/spaces/K10PLUS/pages/358711298/Open+Data"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/kasev/biblical-books",
+      "relation": "isSupplementedBy",
+      "resource_type": "software"
+    }
+  ],
+  "communities": [
+    {
+      "identifier": "digital-humanities"
+    }
+  ],
+  "subjects": [
+    {
+      "term": "library science",
+      "identifier": "http://purl.org/cerif/frapo/LibraryScience"
+    },
+    {
+      "term": "metadata",
+      "identifier": "http://purl.org/cerif/frapo/Metadata"
+    },
+    {
+      "term": "bibliography",
+      "identifier": "http://purl.org/cerif/frapo/Bibliography"
+    }
+  ],
+  "grants": []
+}
